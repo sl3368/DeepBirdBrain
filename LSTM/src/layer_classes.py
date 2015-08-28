@@ -4,7 +4,7 @@ Collection of layer types
 """
 
 import numpy
-
+from numpy import random
 import theano
 import theano.tensor as T
 from theano.tensor.signal import downsample
@@ -40,78 +40,6 @@ class Dropout(object):
         self.output = T.switch(T.neq(is_train, 0), train_output, input)
         
 
-#This variant is the standard multiple input, multiple output version
-class LinearRegressionRandom(object):
-    """Linear Regression Class
-    """
-
-    def __init__(self, input, n_in, n_out, reverse):
-        """ Initialize the parameters of the poisson regression
-
-        :type input: theano.tensor.TensorType
-        :param input: symbolic variable that describes the input of the
-                      architecture (one minibatch)
-
-        :type n_in: int
-        :param n_in: number of input units, the dimension of the space in
-                     which the datapoints lie
-
-        :type n_out: int
-        :param n_out: number of output units, the dimension of the space in
-                      which the labels lie
-
-        """
-
-        # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
-        self.W = theano.shared(value=numpy.asarray(numpy.random.rand(n_in, n_out),
-                                                 dtype=theano.config.floatX),
-                                name='W', borrow=True)
-        # initialize the baises b as a vector of n_out 0s
-        self.b = theano.shared(value=0*numpy.ones((n_out,),
-                                                 dtype=theano.config.floatX),
-                               name='b', borrow=True)
-        bvis = theano.shared( value=numpy.zeros((n_in,),dtype=theano.config.floatX),
-                borrow=True
-            )
-	
-	self.b_prime = bvis
-
-        # helper variables for adagrad
-        self.W_helper = theano.shared(value=numpy.zeros((n_in, n_out), \
-            dtype=theano.config.floatX), name='W_helper', borrow=True)
-        self.b_helper = theano.shared(value=numpy.zeros((n_out,), \
-            dtype=theano.config.floatX), name='b_helper', borrow=True)
-
-        # helper variables for L1
-        self.W_helper2 = theano.shared(value=numpy.zeros((n_in, n_out), \
-            dtype=theano.config.floatX), name='W_helper2', borrow=True)
-        self.b_helper2 = theano.shared(value=numpy.zeros((n_out,), \
-            dtype=theano.config.floatX), name='b_helper2', borrow=True)
-
-        # compute vector of expected values (for each output) in symbolic form
-        self.E_y_given_x = T.dot(input, self.W) + self.b
-
-        # parameters of the model
-	if reverse:
-	    self.params = [self.W, self.b, self.b_prime]
-	else:
-            self.params = [self.W, self.b]
-        self.params_helper = [self.W_helper, self.b_helper]
-        self.params_helper2 = [self.W_helper2, self.b_helper2]
-
-    def reconstruct(self,y):
-	self.reconstructed_x = T.dot(y,self.W.T) + self.b_prime
-
-    def negative_log_likelihood(self, y):
-        """Return the mean of the negative log-likelihood of the prediction
-        of this model under a given target distribution.
-
-        :type y: theano.tensor.TensorType
-        :param y: corresponds to a vector that gives for each example the
-                  correct label
-
-        """
-        return T.mean(   (y - self.E_y_given_x)**2   , axis = 0)
 
 #This variant is the standard multiple input, multiple output version
 class LinearRegression(object):
@@ -693,6 +621,42 @@ class LSTM(object):
                                                                                       
        # output activity
         self.output = h
+    
+    def negative_log_likelihood(self, y):
+        """Return the mean of the negative log-likelihood of the prediction
+        of this model under a given target distribution.
+
+        .. math::
+
+            \frac{1}{|\mathcal{D}|} \mathcal{L} (\theta=\{W,b\}, \mathcal{D}) =
+            \frac{1}{|\mathcal{D}|} \sum_{i=0}^{|\mathcal{D}|}
+                \log(P(Y=y^{(i)}|x^{(i)}, W,b)) \\
+            \ell (\theta=\{W,b\}, \mathcal{D})
+
+        :type y: theano.tensor.TensorType
+        :param y: corresponds to a vector that gives for each example the
+                  correct label
+
+        Note: we use the mean instead of the sum so that
+              the learning rate is less dependent on the batch size
+        """
+        # start-snippet-2
+        # y.shape[0] is (symbolically) the number of rows in y, i.e.,
+        # number of examples (call it n) in the minibatch
+        # T.arange(y.shape[0]) is a symbolic vector which will contain
+        # [0,1,2,... n-1] T.log(self.p_y_given_x) is a matrix of
+        # Log-Probabilities (call it LP) with one row per example and
+        # one column per class LP[T.arange(y.shape[0]),y] is a vector
+        # v containing [LP[0,y[0]], LP[1,y[1]], LP[2,y[2]], ...,
+        # LP[n-1,y[n-1]]] and T.mean(LP[T.arange(y.shape[0]),y]) is
+        # the mean (across minibatch examples) of the elements in v,
+        # i.e., the mean log-likelihood across the minibatch.
+        return -T.mean(T.log(self.output)[T.arange(y.shape[0]), y])
+        # end-snippet-2
+    
+    def cross_entropy_binary(self,y):
+	output = T.clip(self.output, 1e-7, 1-(1e-7))
+	return T.sum(binary_crossentropy(output,y),axis=1)
 
 class LogisticRegression(object):
     """Multi-class Logistic Regression Class
@@ -703,7 +667,8 @@ class LogisticRegression(object):
     determine a class membership probability.
     """
 
-    def __init__(self, input, n_in, n_out):
+    ####REMEMBER THAT RECONSTRUCTION MUST BE SET!!!
+    def __init__(self, input, n_in, n_out,reconstruction=False):
         """ Initialize the parameters of the logistic regression
 
         :type input: theano.tensor.TensorType
@@ -743,6 +708,155 @@ class LogisticRegression(object):
 	bvis = theano.shared(
                 value=numpy.zeros(
                     n_in,
+                    dtype=theano.config.floatX
+                ),
+                borrow=True
+            )
+
+	self.b_prime = bvis
+
+        # symbolic expression for computing the matrix of class-membership
+        # probabilities
+        # Where:
+        # W is a matrix where column-k represent the separation hyperplane for
+        # class-k
+        # x is a matrix where row-j  represents input training sample-j
+        # b is a vector where element-k represent the free parameter of
+        # hyperplane-k
+        self.p_y_given_x = T.nnet.softmax(T.dot(input, self.W) + self.b)
+
+        # symbolic description of how to compute prediction as class whose
+        # probability is maximal
+        self.y_pred = T.argmax(self.p_y_given_x, axis=1)
+        # end-snippet-1
+
+        # parameters of the model
+        if reconstruction:
+	    self.params = [self.W, self.b, self.b_prime]
+	else:
+	    self.params = [self.W, self.b]
+
+        # keep track of model input
+        self.input = input
+
+    ####REMEMBER THAT RECONSTRUCTION MUST BE SET!!!
+    def reconstruct(self,y):
+	self.reconstructed_x = T.nnet.softmax(T.dot(y,self.W.T) + self.b_prime)
+
+    def cross_entropy(self,y):
+	output = T.clip(self.p_y_given_x, 1e-7, 1) #clipping in order to avoid 0*inf situation
+	return T.sum(T.log(output)[T.arange(y.shape[0]),y])
+
+    def cross_entropy_binary(self,y):
+	output = T.clip(self.p_y_given_x, 1e-7, 1-(1e-7))
+	return T.sum(binary_crossentropy(output,y),axis=1)
+
+    def negative_log_likelihood(self, y):
+        """Return the mean of the negative log-likelihood of the prediction
+        of this model under a given target distribution.
+
+        .. math::
+
+            \frac{1}{|\mathcal{D}|} \mathcal{L} (\theta=\{W,b\}, \mathcal{D}) =
+            \frac{1}{|\mathcal{D}|} \sum_{i=0}^{|\mathcal{D}|}
+                \log(P(Y=y^{(i)}|x^{(i)}, W,b)) \\
+            \ell (\theta=\{W,b\}, \mathcal{D})
+
+        :type y: theano.tensor.TensorType
+        :param y: corresponds to a vector that gives for each example the
+                  correct label
+
+        Note: we use the mean instead of the sum so that
+              the learning rate is less dependent on the batch size
+        """
+        # start-snippet-2
+        # y.shape[0] is (symbolically) the number of rows in y, i.e.,
+        # number of examples (call it n) in the minibatch
+        # T.arange(y.shape[0]) is a symbolic vector which will contain
+        # [0,1,2,... n-1] T.log(self.p_y_given_x) is a matrix of
+        # Log-Probabilities (call it LP) with one row per example and
+        # one column per class LP[T.arange(y.shape[0]),y] is a vector
+        # v containing [LP[0,y[0]], LP[1,y[1]], LP[2,y[2]], ...,
+        # LP[n-1,y[n-1]]] and T.mean(LP[T.arange(y.shape[0]),y]) is
+        # the mean (across minibatch examples) of the elements in v,
+        # i.e., the mean log-likelihood across the minibatch.
+        return -T.mean(T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
+        # end-snippet-2
+
+    def errors(self, y):
+        """Return a float representing the number of errors in the minibatch
+        over the total number of examples of the minibatch ; zero one
+        loss over the size of the minibatch
+
+        :type y: theano.tensor.TensorType
+        :param y: corresponds to a vector that gives for each example the
+                  correct label
+        """
+
+        # check if y has same dimension of y_pred
+        if y.ndim != self.y_pred.ndim:
+            raise TypeError(
+                'y should have the same shape as self.y_pred',
+                ('y', y.type, 'y_pred', self.y_pred.type)
+            )
+        # check if y is of the correct datatype
+        if y.dtype.startswith('int'):
+            # the T.neq operator returns a vector of 0s and 1s, where 1
+            # represents a mistake in prediction
+            return T.mean(T.neq(self.y_pred, y))
+        else:
+            raise NotImplementedError()
+
+
+class LogisticRegressionRandom(object):
+    """Multi-class Logistic Regression Class
+
+    The logistic regression is fully described by a weight matrix :math:`W`
+    and bias vector :math:`b`. Classification is done by projecting data
+    points onto a set of hyperplanes, the distance to which is used to
+    determine a class membership probability.
+    """
+
+    def __init__(self, input, n_in, n_out,init):
+        """ Initialize the parameters of the logistic regression
+
+        :type input: theano.tensor.TensorType
+        :param input: symbolic variable that describes the input of the
+                      architecture (one minibatch)
+
+        :type n_in: int
+        :param n_in: number of input units, the dimension of the space in
+                     which the datapoints lie
+
+        :type n_out: int
+        :param n_out: number of output units, the dimension of the space in
+                      which the labels lie
+
+        """
+        # start-snippet-1
+        # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
+        self.W = theano.shared(
+            value=init + numpy.asarray(random.rand(
+                n_in, n_out),
+                dtype=theano.config.floatX
+            ),
+            name='W',
+            borrow=False
+        )
+        # initialize the baises b as a vector of n_out 0s
+        self.b = theano.shared(
+            value=numpy.asarray(numpy.zeros((
+                n_out,)),
+                dtype=theano.config.floatX
+            ),
+            name='b',
+            borrow=True
+        )
+	
+	# initialize reconstruction bias vector
+	bvis = theano.shared(
+                value=numpy.asarray(numpy.zeros((
+                    n_in,)),
                     dtype=theano.config.floatX
                 ),
                 borrow=True

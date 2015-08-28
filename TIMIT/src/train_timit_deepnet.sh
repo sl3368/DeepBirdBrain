@@ -1,9 +1,10 @@
 #!/bin/sh
 
 # Directives
-#PBS -N train_timit_deepnet_10
+#PBS -N train_timit_deepnet_5
 #PBS -W group_list=yetistats
-#PBS -l walltime=70:00:00,mem=30gb
+#PBS -l walltime=72:00:00,mem=20gb,other=gpu
+#PBS -q gpu
 #PBS -M sl3368@columbia.edu
 #PBS -m abe
 #PBS -V

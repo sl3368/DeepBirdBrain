@@ -11,7 +11,7 @@ import numpy
 import theano
 import theano.tensor as T
 from loading_functions import load_all_data, load_class_data_batch, load_class_data_vt
-from layer_classes import LinearRegression, Dropout, LSTM, RNN, hybridRNN , IRNN
+from layer_classes import LinearRegression, Dropout, LSTM, LogisticRegression, LogisticRegressionRandom
 from one_ahead import GradClip, clip_gradient
 from misc import Adam
 
@@ -19,28 +19,28 @@ from misc import Adam
 # Script Parameters
 ################################################
 
-n_epochs=5000
+n_epochs=3000
 
-n_hidden = 240;
+n_hidden = 2459;
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/lstm/1_layer/1000/zebra_1st_20_5000.out'
+results_filename='/vega/stats/users/sl3368/LSTM/results/logistic_1st_1_3000.out'
 
 #Directive and path for loading previous parameters
 load_params = False
-load_params_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_4th_1_500.save'
+load_params_filename = '/vega/stats/users/sl3368/LSTM/saves/params/logistic_1st_1_3000.save'
 
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
+savefilename = '/vega/stats/users/sl3368/LSTM/saves/params/logistic_1st_1_3000.save'
 
 ################################################
 # Load Data
 ################################################
 dataset_info = load_all_data()
 stim = dataset_info[0]
-data_set_x = theano.shared(stim, borrow=True)
+data_set_x = theano.shared(stim, borrow=False)
 
 n_batches = data_set_x.shape[0].eval()/song_size
 
@@ -55,20 +55,25 @@ print 'building the model...'
 
 # allocate symbolic variables for the data
 index = T.lscalar()  # index to a [mini]batch
-x = T.matrix('x')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
+x = T.vector('x')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
 x = clip_gradient(x,1.0)     
-y = T.matrix('y')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
-
+y = T.vector('y')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
+orig = stim[:song_size]
 is_train = T.iscalar('is_train') # pseudo boolean for switching between training and prediction
 
 rng = numpy.random.RandomState(1234)
 
 # Architecture: input --> LSTM --> predict one-ahead
 
-lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
+#lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
+#
+#output = LinearRegression(input=lstm_1.output, n_in=n_hidden, n_out=data_set_x.get_value(borrow=True).shape[1])
+encode = LogisticRegressionRandom(x,n_in=data_set_x.get_value(borrow=True).shape[1], n_out=song_size,init=orig.T)
 
-output = LinearRegression(input=lstm_1.output, n_in=n_hidden, n_out=data_set_x.get_value(borrow=True).shape[1])
+#output = encode.reconstruct(encode.p_y_given_x)
 
+#reconstruction
+cost = T.mean( ( x - T.nnet.softmax(T.dot(encode.p_y_given_x,encode.W.T) + encode.b_prime))**2 )
 
 ################################
 # Objective function and GD
@@ -76,12 +81,9 @@ output = LinearRegression(input=lstm_1.output, n_in=n_hidden, n_out=data_set_x.g
 
 print 'defining cost, parameters, and learning function...'
 
-# the cost we minimize during training is the negative log likelihood of
-# the model 
-cost = T.mean(output.negative_log_likelihood(y))
 
 #Defining params
-params = lstm_1.params + output.params
+params = encode.params 
 
 # updates from ADAM
 updates = Adam(cost, params)
@@ -92,23 +94,29 @@ updates = Adam(cost, params)
 
 print 'compiling train....'
 
-train_model = theano.function(inputs=[index], outputs=cost,
+#train_model = theano.function(inputs=[index], outputs=cost,
+#        updates=updates,
+#        givens={
+#            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
+#            y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
+
+train_model_single = theano.function(inputs=[index], outputs=cost,
         updates=updates,
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-            y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
-
-test_model = theano.function(inputs=[index],
-        outputs=[cost],        givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-            y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
-
-
-validate_model = theano.function(inputs=[index],
-        outputs=cost,
-        givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-            y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
+            x: data_set_x[index],
+            y: data_set_x[index+1]})
+#orig: stim[:song_size],
+#test_model = theano.function(inputs=[index],
+#        outputs=[cost],        givens={
+#            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
+#            y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
+#
+#
+#validate_model = theano.function(inputs=[index],
+#        outputs=cost,
+#        givens={
+#            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
+#            y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
 
 #######################
 # Parameters and gradients
@@ -160,18 +168,14 @@ while (epoch < n_epochs):
     last_e = time.time()
     epoch = epoch + 1
 
-    mb_costs = []
-
-    for minibatch_index in xrange(14):
-        minibatch_avg_cost = train_model(minibatch_index)
-        print minibatch_avg_cost
-	mb_costs.append(minibatch_avg_cost)
-
-    for minibatch_index in xrange(24,30):
-        minibatch_avg_cost = train_model(minibatch_index)
-        print minibatch_avg_cost
-	mb_costs.append(minibatch_avg_cost)
-
+    for minibatch_index in xrange(1):
+	batch_error = []
+	for i in range(song_size*(minibatch_index+1)):
+        #minibatch_avg_cost = train_model(minibatch_index)
+            minibatch_avg_cost = train_model_single(i)
+	    #print minibatch_avg_cost
+	    batch_error.append(minibatch_avg_cost)
+    print numpy.mean(batch_error)
     # compute absolute error loss on validation set
 #    validation_losses = [validate_model(i) for i in val_inds]
 #    this_validation_loss = numpy.mean(validation_losses)
@@ -182,19 +186,17 @@ while (epoch < n_epochs):
 #    r_log.write('epoch %i, minibatch %i, validation error %f\n' % (epoch, minibatch_index + 1, this_validation_loss))
 #    r_log.close()
 
-    avg_cost = numpy.mean(mb_costs)
-    print 'Average training error: '+str(avg_cost)
-    r_log=open(results_filename, 'a')
-    r_log.write('epoch %i, training error %f\n' % (epoch, avg_cost))
-    r_log.close()
 
     # if we got the best validation score until now
-    if avg_cost < best_validation_loss:
-	best_validation_loss = avg_cost
+    if minibatch_avg_cost < best_validation_loss:
+	best_validation_loss = minibatch_avg_cost        
         #store data
         f = file(savefilename, 'wb')
         for obj in [params]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
         f.close()
+
+
+end_time = time.clock()
 
 print '...Finished...'

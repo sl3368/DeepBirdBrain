@@ -5,7 +5,7 @@ import theano
 from theano import shared
 import cPickle, gzip
 from theano import tensor as T
-from layer_classes import LeNetConvPoolLayer, LogisticRegression, LinearRegression, LSTM
+from layer_classes import LeNetConvPoolLayer, LogisticRegression, LinearRegression, LSTM, LinearRegressionRandom
 from misc import Adam
 from loading_functions import load_class_data_batch, load_class_data_vt, shared_dataset
 from load_timit import get_timit_specs_images
@@ -13,7 +13,7 @@ from load_timit import get_timit_specs_images
 ### Tunable parameters and variables ###
 ########################################
 
-n_epochs=15
+n_epochs=5
 
 layer0_filters = 20
 layer1_filters = 20
@@ -21,11 +21,11 @@ layer2_filters = 20
 layer3_filters = 20
 layer4_filters = 20
 
-minibatch_size = 10
+minibatch_size = 100
 window_size = 60
 
-savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/timit_conv_'+str(window_size)+'_5.save'
-results_filename='/vega/stats/users/sl3368/TIMIT/results/timit_conv_'+str(window_size)+'_5.out'
+savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/timit_conv_'+str(window_size)+'_5layers_5.save'
+results_filename='/vega/stats/users/sl3368/TIMIT/results/timit_conv_'+str(window_size)+'_5layers_5.out'
 datapathpre = '/vega/stats/users/sl3368/Data_LC/LowNormData/'
 
 train_x_filename = '/vega/stats/users/sl3368/TIMIT/saves/timit_spec_train_x.npz'
@@ -151,7 +151,7 @@ reg_input = layer3.output.flatten(2)
 
 log_reg = LogisticRegression(reg_input,15*15*layer3_filters, 41)
 
-lin_reg = LinearRegression(reg_input,15*15*layer3_filters,2,True)
+lin_reg = LinearRegressionRandom(reg_input,15*15*layer3_filters,2,True)
 
 log_input = log_reg.p_y_given_x
 lin_input = lin_reg.E_y_given_x
@@ -195,7 +195,7 @@ product_mean_sqr = (T.mean(product,axis=0) **2)
 
 covariance_cost = T.sum( product_mean_sqr )/2
 
-cost = 12*encoder_cost + cross_entropy_cost + 10*covariance_cost
+cost = 50*encoder_cost + cross_entropy_cost + 10*covariance_cost
 
 ###########################################################
 ###########################################################
@@ -258,6 +258,7 @@ while (epoch < n_epochs) :
     last_e = time.time()
     epoch = epoch + 1
 
+    last_m = time.time()
     for minibatch_index in xrange(len(train_x)/5000):
 	sentence = train_x[(minibatch_index*5000):(minibatch_index+1)*5000]
         phonemes = train_y[minibatch_index]
@@ -268,13 +269,16 @@ while (epoch < n_epochs) :
 		phonemes = phonemes[:len(sentence)]
 	sentence = numpy.reshape(sentence,(len(sentence),60))
 	sentence = numpy.asarray(sentence,dtype=numpy.float32)
-	for i in range(0,sentence.shape[0]-minibatch_size,minibatch_size):
+	print 'Last song took: '+str(time.time()-last_m)
+	last_m = time.time()
+	print sentence.shape
+	for i in range(0,sentence.shape[0]-(window_size+minibatch_size),minibatch_size):
 	     input = numpy.zeros((minibatch_size,window_size,sentence.shape[1]))
 	     for k in range(minibatch_size):
 	        input[k] = sentence[i+k:i+k+window_size]
 	     minibatch_avg_cost = train_model(input.astype(numpy.float32),phonemes[i:i+minibatch_size])
 	     #print minibatch_avg_cost
-             print str(minibatch_avg_cost[0])+','+str(minibatch_avg_cost[1])+','+str(minibatch_avg_cost[2])
+             print 'Index: '+str(minibatch_index)+',minibatch: '+str(i)+','+str(minibatch_avg_cost[0])+','+str(minibatch_avg_cost[1])+','+str(minibatch_avg_cost[2])
     
     # calculate validation error
     validation_losses = []
@@ -288,7 +292,7 @@ while (epoch < n_epochs) :
 		phonemes = phonemes[:len(sentence)]
 	sentence = numpy.reshape(sentence,(len(sentence),60))
 	sentence = numpy.asarray(sentence,dtype=numpy.float32)
-	for i in range(0,sentence.shape[0],minibatch_size):
+	for i in range(0,sentence.shape[0]-(window_size+minibatch_size),minibatch_size):
 	     input = numpy.zeros((minibatch_size,window_size,sentence.shape[1]))
 	     for k in range(minibatch_size):
 	        input[k] = sentence[i+k:i+k+window_size]
@@ -296,17 +300,17 @@ while (epoch < n_epochs) :
     loss_totals = [i[0] for i in validation_losses]
     enc = [i[1] for i in validation_losses]
     cross = [i[2] for i in validation_losses]
-    #cov = [i[3] for i in validation_losses]
+    cov = [i[3] for i in validation_losses]
 
     this_validation_loss = numpy.mean(loss_totals)
     encoder_loss = numpy.mean(enc)
     cross_loss = numpy.mean(cross)
-    #cov_loss = numpy.mean(cov)
+    cov_loss = numpy.mean(cov)
     
     # Printing and logging validation error
-    print('epoch %i, validation error %f reconstruction error %f cross entropy error %f covariance error %f' % (epoch,this_validation_loss,encoder_loss,cross_loss))
+    print('epoch %i, validation error %f reconstruction error %f cross entropy error %f covariance error %f' % (epoch,this_validation_loss,encoder_loss,cross_loss,cov_loss))
     r_log=open(results_filename, 'a')
-    r_log.write('epoch %i, validation error %f reconstruction error %f cross entropy error %f covariance error %f\n' % (epoch,this_validation_loss,encoder_loss,cross_loss))
+    r_log.write('epoch %i, validation error %f reconstruction error %f cross entropy error %f covariance error %f\n' % (epoch,this_validation_loss,encoder_loss,cross_loss,cov_loss))
     r_log.close()
 
     # Saving parameters if best result

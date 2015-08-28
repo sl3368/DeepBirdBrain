@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Directives
-#PBS -N 1_layer_zebra_4_3000
+#PBS -N 1_layer_zebra_20_5000
 #PBS -W group_list=yetistats
 #PBS -l walltime=72:00:00,mem=10gb
 #PBS -M sl3368@columbia.edu

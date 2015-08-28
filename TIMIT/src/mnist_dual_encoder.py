@@ -5,7 +5,7 @@ import theano
 from theano import shared
 import cPickle, gzip
 from theano import tensor as T
-from layer_classes import LeNetConvPoolLayer, LogisticRegression, LinearRegression
+from layer_classes import LeNetConvPoolLayer, LogisticRegression, LinearRegression, LinearRegressionRandom
 from misc import Adam
 from loading_functions import load_class_data_batch, load_class_data_vt, shared_dataset
 from sklearn.preprocessing import OneHotEncoder
@@ -14,7 +14,7 @@ from sklearn.metrics import precision_score
 ### Tunable parameters and variables ###
 ########################################
 
-n_epochs=15
+n_epochs=50
 
 #Number of filters per layer
 #must change filter sizes in layer instantiation
@@ -26,11 +26,12 @@ layer4_filters = 20
 
 minibatch_size = 60
 
-savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/deep_dualnet_5_20_15.save'
-results_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_15.out'
+savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/deep_dualnet_5_20_50.save'
+results_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.out'
 datapathpre = '/vega/stats/users/sl3368/Data_LC/LowNormData/'
 
-output_imgs_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_15.imgs'
+output_imgs_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.imgs'
+var_params_filename = '/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.var_params'
 #######################################
 #######################################
 
@@ -120,7 +121,7 @@ reg_input = layer3.output.flatten(2)
 
 log_reg = LogisticRegression(reg_input,7*7*layer3_filters, 10)
 
-lin_reg = LinearRegression(reg_input,7*7*layer3_filters,2,True)
+lin_reg = LinearRegressionRandom(reg_input,7*7*layer3_filters,2,True)
 
 log_input = log_reg.p_y_given_x
 lin_input = lin_reg.E_y_given_x
@@ -144,7 +145,7 @@ layer0.reverseConv(layer1.reverseOutput,(minibatch_size,layer0_filters,28,28),(1
 
 difference = (layer0_input-layer0.reverseOutput) ** 2
 
-encoder_cost = T.mean( difference )
+encoder_cost = T.sum( difference )
 
 cross_entropy_cost = T.mean(log_reg.cross_entropy_binary(y))
 
@@ -164,7 +165,7 @@ product_mean_sqr = (T.mean(product,axis=0) **2)
 
 covariance_cost = T.sum( product_mean_sqr )/2
 
-cost = 12*encoder_cost + cross_entropy_cost + 10*covariance_cost
+cost = encoder_cost + 10*cross_entropy_cost + 10*covariance_cost
 
 ###########################################################
 ###########################################################
@@ -197,7 +198,7 @@ probe_model = theano.function([index,y_enc], outputs=[cost,encoder_cost,cross_en
        								       ,y: y_enc})
 
 validate_model = theano.function(inputs=[index,y_enc],
-        outputs=[cost,encoder_cost,cross_entropy_cost,covariance_cost],
+        outputs=[cost,encoder_cost,cross_entropy_cost,covariance_cost,lin_input],
         givens={
            x: valid_set_x[index * minibatch_size: ((index + 1) * minibatch_size)],
            y: y_enc})
@@ -235,7 +236,7 @@ while (epoch < n_epochs) :
     r_log.close()
     last_e = time.time()
     epoch = epoch + 1
-
+    
     for minibatch_index in xrange(n_train_batches):
 	index = minibatch_index
 	y_vals_single=train_set_y[index * minibatch_size: (index + 1) * minibatch_size].eval()
@@ -246,6 +247,7 @@ while (epoch < n_epochs) :
     
     # calculate validation error
     validation_losses=[]
+    variation_params=[]
     for minibatch_index in xrange(n_valid_batches):
 	index = minibatch_index
 	y_vals_single=valid_set_y[index * minibatch_size: (index + 1) * minibatch_size].eval()
@@ -253,6 +255,7 @@ while (epoch < n_epochs) :
 	target = enc.fit_transform(y_vals)
 	minibatch_avg_cost = validate_model(minibatch_index,target)
 	validation_losses.append(minibatch_avg_cost)
+	variation_params.append(minibatch_avg_cost[4])
 
     loss_totals = [i[0] for i in validation_losses]
     encoder = [i[1] for i in validation_losses]
@@ -274,6 +277,12 @@ while (epoch < n_epochs) :
         #store data
         f = file(savefilename, 'wb')
         for obj in [params]:
+            cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
+        f.close()
+
+        #store variational data
+        f = file(var_params_filename, 'wb')
+        for obj in [variation_params]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
         f.close()
 
@@ -299,10 +308,16 @@ while (epoch < n_epochs) :
 	number_reconstruction = []
 	for number in numbers:
 	    encoded_numbers = new_enc.fit_transform(numpy.reshape(numpy.asarray([number for k in range(minibatch_size)],numpy.float64),(minibatch_size,1)))
+	    vp = variation_params
+            var_p = numpy.zeros((len(vp)*vp[0].shape[0],vp[0].shape[1]))
+            for i in range(len(vp)):
+                var_p[i*vp[i].shape[0]:(i+1)*vp[i].shape[0]] = vp[i]
+	    var_mean = numpy.mean(var_p, axis=0)
+	    var_std = numpy.std(var_p, axis=0)
 	    var_params = []
-	    for v1 in range(-1,2):
+	    for v1 in [var_mean[0]-2*var_std[0],var_mean[0]-var_std[0],var_mean[0],var_mean[0]+var_std[0],var_mean[0]+2*var_std[0]]:
 		v2_params = []
-		for v2 in range(-1,2):
+		for v2 in [var_mean[1]-2*var_std[1],var_mean[1]-var_std[1],var_mean[1],var_mean[1]+var_std[1],var_mean[1]+2*var_std[1]]:
 		    v_params = numpy.reshape(numpy.asarray([[v1,v2] for k in range(minibatch_size)],numpy.float32),(minibatch_size,2))
 		    reconstructed = build_model_reconstructions(encoded_numbers,v_params)
 		    v2_params.append(reconstructed[0][0][0])

@@ -100,16 +100,58 @@ print 'Generating....'
 
 #index = randint(0,num_songs_in_batch)
 index = 0
-
 print 'Song: '+str(index)
 
-y_gen = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
+start = randint(0,1500)
+end = randint(start,2458)
+print 'Start: '+str(start)+' End: '+str(end)
+y_gen_1 = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
 y_gen_truth = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
-for i in xrange(1501,song_size-1):
+#for i in xrange(1501,song_size-1):
+for i in xrange(start,end):
     if i % 100 == 0: 
 	print i
-    y_pred = ygen_model(y_gen)
-    y_gen[i] = numpy.random.normal(y_pred[i-1],
+    y_pred = ygen_model(y_gen_1)
+    y_gen_1[i] = numpy.random.normal(y_pred[i-1],
+                            numpy.sqrt(test_cost))
+
+start = randint(0,1500)
+end = randint(start,2458)
+print 'Start: '+str(start)+' End: '+str(end)
+y_gen_2 = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
+y_gen_truth = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
+#for i in xrange(1501,song_size-1):
+for i in xrange(start,end):
+    if i % 100 == 0: 
+	print i
+    y_pred = ygen_model(y_gen_2)
+    y_gen_2[i] = numpy.random.normal(y_pred[i-1],
+                            numpy.sqrt(test_cost))
+
+start = randint(0,1500)
+end = randint(start,2458)
+print 'Start: '+str(start)+' End: '+str(end)
+y_gen_3 = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
+y_gen_truth = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
+#for i in xrange(1501,song_size-1):
+for i in xrange(start,end):
+    if i % 100 == 0: 
+	print i
+    y_pred = ygen_model(y_gen_3)
+    y_gen_3[i] = numpy.random.normal(y_pred[i-1],
+                            numpy.sqrt(test_cost))
+
+start = randint(0,1500)
+end = randint(start,2458)
+print 'Start: '+str(start)+' End: '+str(end)
+y_gen_4 = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
+y_gen_truth = data_set_x[index * song_size:((index + 1) * song_size - 1)].eval()
+#for i in xrange(1501,song_size-1):
+for i in xrange(start,end):
+    if i % 100 == 0: 
+	print i
+    y_pred = ygen_model(y_gen_4)
+    y_gen_4[i] = numpy.random.normal(y_pred[i-1],
                             numpy.sqrt(test_cost))
 
 print 'Finished Generating...'
@@ -130,9 +172,9 @@ print 'Finished Generating...'
 ################################################
 print 'Saving...'
 
-savefilename = savefilename_pre + str(index)+'_zebra.gen'
+savefilename = savefilename_pre + str(index)+'_zebra.gen_multiple'
 
 f = file(savefilename, 'wb')
-for obj in [[y_gen_truth] + [y_gen]]:
+for obj in [[y_gen_truth] + [y_gen_1] + [y_gen_2] + [y_gen_3] + [y_gen_4]]:
     cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
 f.close()

@@ -11,35 +11,44 @@ import numpy
 import theano
 import theano.tensor as T
 from loading_functions import load_all_data, load_class_data_batch, load_class_data_vt
-from layer_classes import LinearRegression, Dropout, LSTM, RNN, hybridRNN , IRNN
+from layer_classes import LinearRegression, Dropout, LSTM, LogisticRegression
 from one_ahead import GradClip, clip_gradient
 from misc import Adam
+from sklearn.preprocessing import OneHotEncoder
+import numpy.random
 
 ################################################
 # Script Parameters
 ################################################
 
+#ADD COMMAND LINE ARGUMENTS AS PARAMETERS
+
 n_epochs=5000
 
-n_hidden = 240;
+n_hidden = 200;
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/lstm/1_layer/1000/zebra_1st_20_5000.out'
+results_filename='/vega/stats/users/sl3368/LSTM/results/encoder_lstm.out'
 
 #Directive and path for loading previous parameters
 load_params = False
 load_params_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_4th_1_500.save'
 
-song_size = 2459
+song_size = 100
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
+savefilename = '/vega/stats/users/sl3368/LSTM/saves/params/encoder_lstm.save'
 
 ################################################
 # Load Data
 ################################################
-dataset_info = load_all_data()
-stim = dataset_info[0]
+#dataset_info = load_all_data()
+#stim = dataset_info[0]
+encodings = numpy.arange(song_size,dtype=theano.config.floatX)
+numpy.random.shuffle(encodings)
+stim = numpy.reshape(encodings,(song_size,1))
+enc = OneHotEncoder(n_values=song_size,dtype=numpy.float32,sparse=False)
+stim = enc.fit_transform(stim)
 data_set_x = theano.shared(stim, borrow=True)
 
 n_batches = data_set_x.shape[0].eval()/song_size
@@ -67,7 +76,7 @@ rng = numpy.random.RandomState(1234)
 
 lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
 
-output = LinearRegression(input=lstm_1.output, n_in=n_hidden, n_out=data_set_x.get_value(borrow=True).shape[1])
+output = LogisticRegression(input=lstm_1.output, n_in=n_hidden, n_out=data_set_x.get_value(borrow=True).shape[1])
 
 
 ################################
@@ -78,7 +87,7 @@ print 'defining cost, parameters, and learning function...'
 
 # the cost we minimize during training is the negative log likelihood of
 # the model 
-cost = T.mean(output.negative_log_likelihood(y))
+cost = T.mean(output.cross_entropy_binary(y))
 
 #Defining params
 params = lstm_1.params + output.params
@@ -160,17 +169,9 @@ while (epoch < n_epochs):
     last_e = time.time()
     epoch = epoch + 1
 
-    mb_costs = []
-
-    for minibatch_index in xrange(14):
+    for minibatch_index in xrange(1):
         minibatch_avg_cost = train_model(minibatch_index)
         print minibatch_avg_cost
-	mb_costs.append(minibatch_avg_cost)
-
-    for minibatch_index in xrange(24,30):
-        minibatch_avg_cost = train_model(minibatch_index)
-        print minibatch_avg_cost
-	mb_costs.append(minibatch_avg_cost)
 
     # compute absolute error loss on validation set
 #    validation_losses = [validate_model(i) for i in val_inds]
@@ -182,19 +183,17 @@ while (epoch < n_epochs):
 #    r_log.write('epoch %i, minibatch %i, validation error %f\n' % (epoch, minibatch_index + 1, this_validation_loss))
 #    r_log.close()
 
-    avg_cost = numpy.mean(mb_costs)
-    print 'Average training error: '+str(avg_cost)
-    r_log=open(results_filename, 'a')
-    r_log.write('epoch %i, training error %f\n' % (epoch, avg_cost))
-    r_log.close()
 
     # if we got the best validation score until now
-    if avg_cost < best_validation_loss:
-	best_validation_loss = avg_cost
+    if minibatch_avg_cost < best_validation_loss:
+	best_validation_loss = minibatch_avg_cost        
         #store data
         f = file(savefilename, 'wb')
         for obj in [params]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
         f.close()
+
+
+end_time = time.clock()
 
 print '...Finished...'
