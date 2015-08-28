@@ -28,20 +28,21 @@ held_out_song = int(sys.argv[2])
 brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
 
-n_epochs= 150
+n_epochs= 250
 n_hidden = 240
+lag = 60
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/'+brain_region+'_'+str(held_out_song)+'.out'
+results_filename='/vega/stats/users/sl3368/rnn_code/results/glm/'+brain_region+'_'+str(held_out_song)+'.out'
 
 #Directive and path for loading previous parameters
-load_params_lstm = True
+load_params_lstm = False
 load_params_lstm_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
 
 #check if exists already, then load or not load 
-load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/'+brain_region+'_'+str(held_out_song)+'.save'
+load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/glm/'+brain_region+'_'+str(held_out_song)+'.save'
 if path.isfile(load_params_pr_filename):
     print 'Will load previous regression parameters...'
     load_params_pr = True
@@ -52,9 +53,9 @@ else:
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/'+brain_region+'_'+str(held_out_song)+'.save'
+savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/glm/'+brain_region+'_'+str(held_out_song)+'.save'
 
-neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/neural/'+brain_region+'_'+str(held_out_song)+'.save_neurons'
+neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/glm/'+brain_region+'_'+str(held_out_song)+'.save_neurons'
 
 ################################################
 # Load Data
@@ -69,12 +70,14 @@ n_train_batches = n_batches
 
 print 'Number of songs in single matlab chunk: '+str(n_train_batches)
 
+
 print 'Getting neural data...'
 
 neural_data = load_neural_data()
 
 ntrials = theano.shared(neural_data[brain_region_index],borrow=True)
 responses = theano.shared(neural_data[brain_region_index+1],borrow=True)
+
 
 ######################
 # BUILD ACTUAL MODEL #
@@ -93,11 +96,9 @@ is_train = T.iscalar('is_train') # pseudo boolean for switching between training
 
 rng = numpy.random.RandomState(1234)
 
-# Architecture: input --> LSTM --> predict one-ahead
+x_in = x.reshape((1,data_set_x.get_value(borrow=True).shape[1]*lag))
 
-lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
-
-output = PoissonRegression(input=lstm_1.output, n_in=n_hidden, n_out=responses.get_value(borrow=True).shape[1])
+output = PoissonRegression(input=x_in, n_in=data_set_x.get_value(borrow=True).shape[1]*lag, n_out=responses.get_value(borrow=True).shape[1])
 
 nll = output.negative_log_likelihood(y,trial_no)
 
@@ -126,9 +127,9 @@ print 'compiling train....'
 train_model = theano.function(inputs=[index], outputs=cost,
         updates=updates,
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size - 1)],
-            y: responses[index * song_size:((index + 1) * song_size - 1)]})
+            x: data_set_x[index - lag : index],
+	    trial_no: ntrials[index:index+1],
+            y: responses[index:index+1]})
 
 #test_model = theano.function(inputs=[index],
 #        outputs=[cost],        givens={
@@ -140,9 +141,9 @@ train_model = theano.function(inputs=[index], outputs=cost,
 validate_model = theano.function(inputs=[index],
         outputs=[cost,nll],
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size - 1)],
-            y: responses[index * song_size:((index + 1) * song_size - 1)]})
+            x: data_set_x[index - lag : index],
+	    trial_no: ntrials[index:index+1],
+            y: responses[index:index+1]})
 
 #######################
 # Parameters and gradients
@@ -204,30 +205,39 @@ while (epoch < n_epochs):
 
     for minibatch_index in xrange(14):
         if(heldout!=held_out_song):
-            minibatch_avg_cost = train_model(minibatch_index)
-            print minibatch_avg_cost
-	    mb_costs.append(minibatch_avg_cost)
+            for song_i in range(lag,song_size):
+	        minibatch_avg_cost = train_model(minibatch_index*song_size+song_i)
+	        mb_costs.append(minibatch_avg_cost)
 	heldout=heldout+1
 
     for minibatch_index in xrange(24,30):
         if(heldout!=held_out_song):
-	    minibatch_avg_cost = train_model(minibatch_index)
-            print minibatch_avg_cost
-	    mb_costs.append(minibatch_avg_cost)
+            for song_i in range(lag,song_size):
+	        minibatch_avg_cost = train_model(minibatch_index*song_size+song_i)
+	        mb_costs.append(minibatch_avg_cost)
 	heldout=heldout+1
 
     avg_cost = numpy.mean(mb_costs)
-    validation_info = validate_model(held_out_song)
+    validation_cost = []
+    validation_vec = []
+    for song_i in range(lag,song_size):
+	val_i = validate_model(held_out_song*song_size+song_i)
+        validation_cost.append(val_i[0])
+	validation_vec.append(val_i[1])
 
-    print('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, validation_info[0]))
+    val_mean = numpy.mean(validation_cost)
+    val_vec_mean = numpy.mean(numpy.array(validation_vec),axis=0)
+    print val_vec_mean.shape
+
+    print('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, val_mean))
     
     r_log=open(results_filename, 'a')
-    r_log.write('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, validation_info[0]))
+    r_log.write('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, val_mean))
     r_log.close()
 
     # if we got the best validation score until now
-    if validation_info[0] < best_validation_loss:
-	best_validation_loss = validation_info[0]
+    if val_mean < best_validation_loss:
+	best_validation_loss = val_mean
         #store data
         f = file(savefilename, 'wb')
         for obj in [params]:
@@ -235,7 +245,7 @@ while (epoch < n_epochs):
         f.close()
         
         f = file(neurons_savefilename, 'wb')
-        for obj in [validation_info[1]]:
+        for obj in [val_vec_mean]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
         f.close()
 

@@ -14,7 +14,7 @@ from sklearn.metrics import precision_score
 ### Tunable parameters and variables ###
 ########################################
 
-n_epochs=50
+n_epochs=200
 
 #Number of filters per layer
 #must change filter sizes in layer instantiation
