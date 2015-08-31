@@ -22,31 +22,33 @@ import numpy.random
 ################################################
 
 #ADD COMMAND LINE ARGUMENTS AS PARAMETERS
+# script name, n_hidden, n_numbers, signal_size, trial
 
 n_epochs=5000
 
-n_hidden = 200;
+n_hidden = int(sys.argv[1])
+song_size = int(sys.argv[2])
+signal_size = int(sys.argv[3])
+trial = int(sys.argv[4])
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/LSTM/results/encoder_lstm.out'
+results_filename='/vega/stats/users/sl3368/LSTM/results/lstm_'+str(n_hidden)+'_'+str(song_size)+'_'+str(signal_size)+'_'+str(trial)+'.out'
 
 #Directive and path for loading previous parameters
 load_params = False
 load_params_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_4th_1_500.save'
 
-song_size = 100
-
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/LSTM/saves/params/encoder_lstm.save'
+savefilename = '/vega/stats/users/sl3368/LSTM/saves/params/lstm_'+str(n_hidden)+'_'+str(song_size)+'_'+str(signal_size)+'_'+str(trial)+'.save'
 
 ################################################
 # Load Data
 ################################################
 #dataset_info = load_all_data()
 #stim = dataset_info[0]
-encodings = numpy.arange(song_size,dtype=theano.config.floatX)
-numpy.random.shuffle(encodings)
-stim = numpy.reshape(encodings,(song_size,1))
+
+encodings = numpy.random.randint(song_size,size=signal_size)
+stim = numpy.reshape(encodings,(signal_size,1))
 enc = OneHotEncoder(n_values=song_size,dtype=numpy.float32,sparse=False)
 stim = enc.fit_transform(stim)
 data_set_x = theano.shared(stim, borrow=True)
@@ -189,7 +191,7 @@ while (epoch < n_epochs):
 	best_validation_loss = minibatch_avg_cost        
         #store data
         f = file(savefilename, 'wb')
-        for obj in [params]:
+        for obj in [best_validation_loss]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
         f.close()
 

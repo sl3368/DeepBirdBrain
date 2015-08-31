@@ -30,7 +30,7 @@ brain_region_index = region_dict[brain_region]
 
 n_epochs= 250
 n_hidden = 240
-lag = 60
+lag = 5
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
 
@@ -96,7 +96,8 @@ is_train = T.iscalar('is_train') # pseudo boolean for switching between training
 
 rng = numpy.random.RandomState(1234)
 
-x_in = x.reshape((1,data_set_x.get_value(borrow=True).shape[1]*lag))
+#x_in = x.reshape((1,data_set_x.get_value(borrow=True).shape[1]*lag))
+x_in = x
 
 output = PoissonRegression(input=x_in, n_in=data_set_x.get_value(borrow=True).shape[1]*lag, n_out=responses.get_value(borrow=True).shape[1])
 
@@ -124,12 +125,11 @@ updates = Adam(cost, params)
 
 print 'compiling train....'
 
-train_model = theano.function(inputs=[index], outputs=cost,
+train_model = theano.function(inputs=[index,x], outputs=cost,
         updates=updates,
         givens={
-            x: data_set_x[index - lag : index],
-	    trial_no: ntrials[index:index+1],
-            y: responses[index:index+1]})
+	    trial_no: ntrials[index*song_size+lag:(index+1)*song_size],
+            y: responses[index*song_size+lag:(index+1)*song_size]})
 
 #test_model = theano.function(inputs=[index],
 #        outputs=[cost],        givens={
@@ -138,12 +138,11 @@ train_model = theano.function(inputs=[index], outputs=cost,
 #
 #
 
-validate_model = theano.function(inputs=[index],
+validate_model = theano.function(inputs=[index,x],
         outputs=[cost,nll],
         givens={
-            x: data_set_x[index - lag : index],
-	    trial_no: ntrials[index:index+1],
-            y: responses[index:index+1]})
+	    trial_no: ntrials[index*song_size+lag:(index+1)*song_size],
+            y: responses[index*song_size+lag:(index+1)*song_size]})
 
 #######################
 # Parameters and gradients
@@ -205,39 +204,51 @@ while (epoch < n_epochs):
 
     for minibatch_index in xrange(14):
         if(heldout!=held_out_song):
-            for song_i in range(lag,song_size):
-	        minibatch_avg_cost = train_model(minibatch_index*song_size+song_i)
-	        mb_costs.append(minibatch_avg_cost)
+            input = numpy.zeros((song_size-lag,60*lag),dtype=theano.config.floatX)
+    	    for song_i in range(lag,song_size):
+		input[song_i-lag] = stim[minibatch_index*song_size+song_i-lag:minibatch_index*song_size+song_i].flatten()
+	    minibatch_avg_cost = train_model(minibatch_index,input)
+	    print minibatch_avg_cost
+	    mb_costs.append(minibatch_avg_cost)
 	heldout=heldout+1
 
     for minibatch_index in xrange(24,30):
         if(heldout!=held_out_song):
-            for song_i in range(lag,song_size):
-	        minibatch_avg_cost = train_model(minibatch_index*song_size+song_i)
-	        mb_costs.append(minibatch_avg_cost)
+            input = numpy.zeros((song_size-lag,60*lag),dtype=theano.config.floatX)
+    	    for song_i in range(lag,song_size):
+		input[song_i-lag] = stim[minibatch_index*song_size+song_i-lag:minibatch_index*song_size+song_i].flatten()
+	    minibatch_avg_cost = train_model(minibatch_index,input)
+	    print minibatch_avg_cost
+	    mb_costs.append(minibatch_avg_cost)
 	heldout=heldout+1
 
     avg_cost = numpy.mean(mb_costs)
     validation_cost = []
     validation_vec = []
+    input = numpy.zeros((song_size-lag,60*lag),dtype=theano.config.floatX)
     for song_i in range(lag,song_size):
-	val_i = validate_model(held_out_song*song_size+song_i)
-        validation_cost.append(val_i[0])
-	validation_vec.append(val_i[1])
+        input[song_i-lag] = stim[held_out_song*song_size+song_i-lag:held_out_song*song_size+song_i].flatten()
+    val_i = validate_model(held_out_song,input)
 
-    val_mean = numpy.mean(validation_cost)
-    val_vec_mean = numpy.mean(numpy.array(validation_vec),axis=0)
-    print val_vec_mean.shape
+#    for song_i in range(lag,song_size):
+#	val_i = validate_model(held_out_song*song_size+song_i)
+#        validation_cost.append(val_i[0])
+#	validation_vec.append(val_i[1])
 
-    print('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, val_mean))
+#    val_mean = numpy.mean(validation_cost)
+#    val_vec_mean = numpy.mean(numpy.array(validation_vec),axis=0)
+#    val_vec_mean = numpy.mean(val_i[1], axis=0)
+    val_vec_mean = val_i[1]
+
+    print('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, val_i[0]))
     
     r_log=open(results_filename, 'a')
-    r_log.write('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, val_mean))
+    r_log.write('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, val_i[0]))
     r_log.close()
 
     # if we got the best validation score until now
-    if val_mean < best_validation_loss:
-	best_validation_loss = val_mean
+    if val_i[0] < best_validation_loss:
+	best_validation_loss = val_i[0]
         #store data
         f = file(savefilename, 'wb')
         for obj in [params]:

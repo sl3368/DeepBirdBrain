@@ -28,7 +28,7 @@ held_out_song = int(sys.argv[2])
 brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
 
-n_epochs= 150
+n_epochs= 200
 n_hidden = 240
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)

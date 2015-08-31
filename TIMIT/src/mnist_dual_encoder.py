@@ -14,7 +14,7 @@ from sklearn.metrics import precision_score
 ### Tunable parameters and variables ###
 ########################################
 
-n_epochs=200
+n_epochs=500
 
 #Number of filters per layer
 #must change filter sizes in layer instantiation
@@ -26,12 +26,12 @@ layer4_filters = 20
 
 minibatch_size = 60
 
-savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/deep_dualnet_5_20_50.save'
-results_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.out'
+savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/deep_dualnet_5_20_500.save'
+results_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_500.out'
 datapathpre = '/vega/stats/users/sl3368/Data_LC/LowNormData/'
 
-output_imgs_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.imgs'
-var_params_filename = '/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.var_params'
+output_imgs_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_500.imgs'
+var_params_filename = '/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_500.var_params'
 #######################################
 #######################################
 
