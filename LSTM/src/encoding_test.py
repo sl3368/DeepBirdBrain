@@ -39,7 +39,7 @@ load_params = False
 load_params_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_4th_1_500.save'
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/LSTM/saves/params/lstm_'+str(n_hidden)+'_'+str(song_size)+'_'+str(signal_size)+'_'+str(trial)+'.save'
+savefilename = '/vega/stats/users/sl3368/LSTM/saves/tests/lstm_'+str(n_hidden)+'_'+str(song_size)+'_'+str(signal_size)+'_'+str(trial)+'.save'
 
 ################################################
 # Load Data
@@ -106,8 +106,8 @@ print 'compiling train....'
 train_model = theano.function(inputs=[index], outputs=cost,
         updates=updates,
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-            y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
+            x: data_set_x[index * signal_size:((index + 1) * signal_size - 1)],
+            y: data_set_x[(index * signal_size + 1):(index + 1) * signal_size]})
 
 test_model = theano.function(inputs=[index],
         outputs=[cost],        givens={
@@ -157,16 +157,16 @@ epoch = 0
 
 last_e = time.time()
 
-r_log=open(results_filename,'w')
-r_log.write('Starting training...\n')
-r_log.close()
+#r_log=open(results_filename,'w')
+#r_log.write('Starting training...\n')
+#r_log.close()
 
 while (epoch < n_epochs):
     print str(epoch)+' epoch took: '+str(time.time()-last_e)
    
-    r_log=open(results_filename, 'a')
-    r_log.write(str(epoch)+ ' epoch took: '+str(time.time()-last_e)+'\n')
-    r_log.close()
+#    r_log=open(results_filename, 'a')
+#    r_log.write(str(epoch)+ ' epoch took: '+str(time.time()-last_e)+'\n')
+#    r_log.close()
 
     last_e = time.time()
     epoch = epoch + 1

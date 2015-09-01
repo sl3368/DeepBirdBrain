@@ -24,7 +24,7 @@ n_epochs=5000
 n_hidden = 240;
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/lstm/1_layer/1000/zebra_1st_20_5000.out'
+results_filename='/vega/stats/users/sl3368/rnn_code/results/lstm/1_layer/1000/test.out'
 
 #Directive and path for loading previous parameters
 load_params = False
@@ -33,7 +33,7 @@ load_params_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_la
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
+savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/test.save'
 
 ################################################
 # Load Data
