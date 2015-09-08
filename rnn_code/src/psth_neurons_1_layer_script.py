@@ -184,8 +184,13 @@ print 'computing psth...'
 while (epoch < n_epochs):
 
     epoch = epoch + 1
-
-    validation_info = validate_model(held_out_song)
+    
+    if held_out_song<14:
+        heldoutsong=held_out_song
+    else:
+        heldoutsong=held_out_song+10
+    
+    validation_info = validate_model(heldoutsong)
 
     f = file(psth_savefilename, 'wb')
     for obj in [validation_info[2]]:

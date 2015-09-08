@@ -28,7 +28,7 @@ held_out_song = int(sys.argv[2])
 brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
 
-n_epochs= 200
+n_epochs= 150
 n_hidden = 240
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
@@ -217,7 +217,12 @@ while (epoch < n_epochs):
 	heldout=heldout+1
 
     avg_cost = numpy.mean(mb_costs)
-    validation_info = validate_model(held_out_song)
+    
+    if held_out_song<14:
+	heldoutsong=held_out_song
+    else:
+	heldoutsong=held_out_song+10
+    validation_info = validate_model(heldoutsong)
 
     print('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, validation_info[0]))
     
