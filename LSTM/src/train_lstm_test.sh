@@ -1,11 +1,11 @@
 #!/bin/sh
 
 # Directives
-#PBS -N LSTM_Testing
+#PBS -N LSTM_Testing_200
 #PBS -W group_list=yetistats
 #PBS -l walltime=4:00:00,mem=4gb
 #PBS -M sl3368@columbia.edu
-#PBS -m abe
+#PBS -m a
 #PBS -V
 
 # Set output and error directories

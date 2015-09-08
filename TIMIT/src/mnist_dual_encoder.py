@@ -14,7 +14,7 @@ from sklearn.metrics import precision_score
 ### Tunable parameters and variables ###
 ########################################
 
-n_epochs=500
+n_epochs=50
 
 #Number of filters per layer
 #must change filter sizes in layer instantiation
@@ -26,12 +26,12 @@ layer4_filters = 20
 
 minibatch_size = 60
 
-savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/deep_dualnet_5_20_500.save'
-results_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_500.out'
+savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/deep_dualnet_5_20_50.save'
+results_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.out'
 datapathpre = '/vega/stats/users/sl3368/Data_LC/LowNormData/'
 
-output_imgs_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_500.imgs'
-var_params_filename = '/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_500.var_params'
+output_imgs_filename='/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.imgs'
+var_params_filename = '/vega/stats/users/sl3368/TIMIT/results/deep_dualnet_5_20_50.var_params'
 #######################################
 #######################################
 
@@ -145,7 +145,7 @@ layer0.reverseConv(layer1.reverseOutput,(minibatch_size,layer0_filters,28,28),(1
 
 difference = (layer0_input-layer0.reverseOutput) ** 2
 
-encoder_cost = T.sum( difference )
+encoder_cost = T.mean( difference )
 
 cross_entropy_cost = T.mean(log_reg.cross_entropy_binary(y))
 
@@ -165,7 +165,7 @@ product_mean_sqr = (T.mean(product,axis=0) **2)
 
 covariance_cost = T.sum( product_mean_sqr )/2
 
-cost = encoder_cost + 10*cross_entropy_cost + 10*covariance_cost
+cost = 25*encoder_cost + 10*cross_entropy_cost + 10*covariance_cost
 
 ###########################################################
 ###########################################################

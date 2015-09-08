@@ -39,7 +39,7 @@ load_params = False
 load_params_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_4th_1_500.save'
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/LSTM/saves/tests/lstm_'+str(n_hidden)+'_'+str(song_size)+'_'+str(signal_size)+'_'+str(trial)+'.save'
+savefilename = '/vega/stats/users/sl3368/LSTM/saves/'+str(n_hidden)+'/lstm_'+str(n_hidden)+'_'+str(song_size)+'_'+str(signal_size)+'_'+str(trial)+'.save'
 
 ################################################
 # Load Data
