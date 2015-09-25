@@ -3,7 +3,7 @@ import os
 import subprocess
 
 #parameters are: n_hidden, song_size, signal length, trials
-n_hidden = 200
+n_hidden = 100
 song_size = 25
 
 for signal_length in range(20,1801,20):

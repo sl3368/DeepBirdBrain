@@ -15,17 +15,17 @@ from load_timit import get_timit_specs_images
 
 n_epochs=5
 
-layer0_filters = 20
-layer1_filters = 20
-layer2_filters = 20
-layer3_filters = 20
+layer0_filters = 100
+layer1_filters = 80
+layer2_filters = 60
+layer3_filters = 40
 layer4_filters = 20
 
 minibatch_size = 100
 window_size = 60
 
-savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/timit_conv_'+str(window_size)+'_5layers_5.save'
-results_filename='/vega/stats/users/sl3368/TIMIT/results/timit_conv_'+str(window_size)+'_5layers_5.out'
+savefilename = '/vega/stats/users/sl3368/TIMIT/saves/params/timit_conv_'+str(window_size)+'_5layers_100.save'
+results_filename='/vega/stats/users/sl3368/TIMIT/results/timit_conv_'+str(window_size)+'_5layers_100.out'
 datapathpre = '/vega/stats/users/sl3368/Data_LC/LowNormData/'
 
 train_x_filename = '/vega/stats/users/sl3368/TIMIT/saves/timit_spec_train_x.npz'

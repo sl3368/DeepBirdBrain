@@ -11,29 +11,32 @@ import numpy
 import theano
 import theano.tensor as T
 from loading_functions import load_all_data, load_class_data_batch, load_class_data_vt
-from layer_classes import LinearRegression, Dropout, LSTM, RNN, hybridRNN , IRNN
-from one_ahead import GradClip, clip_gradient
+from layer_classes import LinearRegression, Dropout, LSTM, LeNetConvPoolLayer, HiddenLayer
+from one_ahead import clip_gradient
 from misc import Adam
 
 ################################################
 # Script Parameters
 ################################################
 
-n_epochs=1000
+n_epochs= 350
 
 n_hidden = 400
 
+filter_number_1 = 10
+filter_number_2 = 5
+
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/zebra_neural/zebra_lstm_400_1st.out'
+results_filename='/vega/stats/users/sl3368/CLDNN/results/deep_one_ahead_3rd.out'
 
 #Directive and path for loading previous parameters
-load_params = False
-load_params_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_4th_1_500.save'
+load_params = True
+load_params_filename = '/vega/stats/users/sl3368/CLDNN/saves/deep_one_ahead_2nd.save'
 
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/zebra_lstm/zebra_lstm_400_1st.save'
+savefilename = '/vega/stats/users/sl3368/CLDNN/saves/deep_one_ahead_3rd.save'
 
 ################################################
 # Load Data
@@ -64,11 +67,41 @@ is_train = T.iscalar('is_train') # pseudo boolean for switching between training
 rng = numpy.random.RandomState(1234)
 
 # Architecture: input --> LSTM --> predict one-ahead
+layer0_input = x.reshape((1, 1, song_size-1, 60))
 
-lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
+layer0 = LeNetConvPoolLayer(
+    rng,
+    input=layer0_input,
+    image_shape=(1, 1, song_size-1, 60),
+    filter_shape=( filter_number_1, 1, 1, 3),
+    poolsize=(1, 3),
+    dim2 = 1
+)
 
-output = LinearRegression(input=lstm_1.output, n_in=n_hidden, n_out=data_set_x.get_value(borrow=True).shape[1])
+layer1 = LeNetConvPoolLayer(
+    rng,
+    input=layer0.output,
+    image_shape=(1, filter_number_1, song_size-1, 20),
+    filter_shape=( filter_number_2, filter_number_1, 1, 2),
+    poolsize=(1, 2),
+    dim2 = 1
+)
 
+lstm_input = layer1.output.reshape((song_size-1,10 * filter_number_2))
+
+#May be worth splitting to different LSTMs...would require smaller filter size
+lstm_1 = LSTM(rng, lstm_input, n_in=10 * filter_number_2, n_out=n_hidden)
+
+#output = LinearRegression(input=lstm_1.output, n_in=n_hidden, n_out=data_set_x.get_value(borrow=True).shape[1])
+dnn = HiddenLayer(rng, lstm_1.output, n_in=n_hidden, n_out= 10 * filter_number_2)
+
+dnn_output = dnn.output.reshape((1,filter_number_2,song_size-1,10))
+
+layer1.reverseConv(dnn_output,(1,filter_number_2,song_size-1,20),(filter_number_1,filter_number_2,1,2)) #filter flipped on first two axes
+
+layer0.reverseConv(layer1.reverseOutput,(1,filter_number_1,song_size-1,60),(1,filter_number_1,1,3)) #filter flipped on first two axes
+
+reconstructed = layer0.reverseOutput.reshape((song_size-1,60))
 
 ################################
 # Objective function and GD
@@ -78,10 +111,10 @@ print 'defining cost, parameters, and learning function...'
 
 # the cost we minimize during training is the negative log likelihood of
 # the model 
-cost = T.mean(output.negative_log_likelihood(y))
+cost = T.mean((y-reconstructed) **2)
 
 #Defining params
-params = lstm_1.params + output.params
+params = lstm_1.params + layer0.params + layer1.params + dnn.params
 
 # updates from ADAM
 updates = Adam(cost, params)
@@ -98,14 +131,13 @@ train_model = theano.function(inputs=[index], outputs=cost,
             x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
             y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
 
-test_model = theano.function(inputs=[index],
-        outputs=[cost],        givens={
+test_model = theano.function(inputs=[index],outputs=[cost],        
+	givens={
             x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
             y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
 
 
-validate_model = theano.function(inputs=[index],
-        outputs=cost,
+validate_model = theano.function(inputs=[index], outputs=[layer1.reverseOutput.shape,layer1.reverseOutput],
         givens={
             x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
             y: data_set_x[(index * song_size + 1):(index + 1) * song_size]})
@@ -132,8 +164,12 @@ if load_params:
     lstm_1.b_f.set_value(old_p[10].get_value(), borrow=True)
     lstm_1.b_c.set_value(old_p[11].get_value(), borrow=True)
     lstm_1.b_o.set_value(old_p[12].get_value(), borrow=True)
-    output.W.set_value(old_p[13].get_value(), borrow=True)
-    output.b.set_value(old_p[14].get_value(), borrow=True)
+    layer0.W.set_value(old_p[13].get_value(), borrow=True)
+    layer0.b.set_value(old_p[14].get_value(), borrow=True)
+    layer1.W.set_value(old_p[15].get_value(), borrow=True)
+    layer1.b.set_value(old_p[16].get_value(), borrow=True)
+    dnn.W.set_value(old_p[17].get_value(), borrow=True)
+    dnn.b.set_value(old_p[18].get_value(), borrow=True)
 
 
 ###############

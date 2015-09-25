@@ -97,7 +97,7 @@ rng = numpy.random.RandomState(1234)
 lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
 
 output = PoissonRegression(input=lstm_1.output, n_in=n_hidden, n_out=responses.get_value(borrow=True).shape[1])
-pred = output.E_y_given_x
+pred = output.E_y_given_x * trial_no
 nll = output.negative_log_likelihood(y,trial_no)
 
 ################################
@@ -139,9 +139,9 @@ print 'compiling train....'
 validate_model = theano.function(inputs=[index],
         outputs=[cost,nll,pred],
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size - 1)],
-            y: responses[index * song_size:((index + 1) * song_size - 1)]})
+            x: data_set_x[index * song_size:((index + 1) * song_size)],
+	    trial_no: ntrials[index * song_size:((index + 1) * song_size)],
+            y: responses[index * song_size:((index + 1) * song_size)]})
 
 #######################
 # Parameters and gradients
