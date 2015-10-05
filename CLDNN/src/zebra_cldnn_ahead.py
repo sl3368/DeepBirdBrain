@@ -26,16 +26,16 @@ n_hidden = 400
 filter_number = 20
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/CLDNN/results/one_ahead_2nd.out'
+results_filename='/vega/stats/users/sl3368/CLDNN/results/one_ahead_5th.out'
 
 #Directive and path for loading previous parameters
 load_params = True
-load_params_filename = '/vega/stats/users/sl3368/CLDNN/saves/one_ahead_1st.save'
+load_params_filename = '/vega/stats/users/sl3368/CLDNN/saves/one_ahead_4th.save'
 
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/CLDNN/saves/one_ahead_2nd.save'
+savefilename = '/vega/stats/users/sl3368/CLDNN/saves/one_ahead_5th.save'
 
 ################################################
 # Load Data

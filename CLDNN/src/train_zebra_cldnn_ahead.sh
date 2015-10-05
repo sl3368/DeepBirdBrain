@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Directives
-#PBS -N cldnn_zebra_ahead_1
+#PBS -N cldnn_zebra_ahead_5
 #PBS -W group_list=yetistats
 #PBS -l walltime=72:00:00,mem=10gb
 #PBS -M sl3368@columbia.edu
