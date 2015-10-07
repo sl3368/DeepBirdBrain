@@ -27,16 +27,16 @@ filter_number_1 = 10
 filter_number_2 = 5
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/CLDNN/results/deep_one_ahead_6th.out'
+results_filename='/vega/stats/users/sl3368/CLDNN/results/deep_one_ahead_7th.out'
 
 #Directive and path for loading previous parameters
 load_params = True
-load_params_filename = '/vega/stats/users/sl3368/CLDNN/saves/deep_one_ahead_5th.save'
+load_params_filename = '/vega/stats/users/sl3368/CLDNN/saves/deep_one_ahead_6th.save'
 
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/CLDNN/saves/deep_one_ahead_6th.save'
+savefilename = '/vega/stats/users/sl3368/CLDNN/saves/deep_one_ahead_7th.save'
 
 ################################################
 # Load Data
