@@ -28,20 +28,20 @@ held_out_song = int(sys.argv[2])
 brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
 
-n_epochs= 500
-n_hidden = 240
+n_epochs= 30
+n_hidden = 300
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/dual/'+brain_region+'_'+str(held_out_song)+'.out'
+results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/dual_max/'+brain_region+'_'+str(held_out_song)+'.out'
 
 #Directive and path for loading previous parameters
 load_params_lstm = False
 load_params_lstm_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
 
 #check if exists already, then load or not load 
-load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual/'+brain_region+'_'+str(held_out_song)+'.save'
+load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_max/'+brain_region+'_'+str(held_out_song)+'.save'
 if path.isfile(load_params_pr_filename):
     print 'Will load previous regression parameters...'
     load_params_pr = True
@@ -52,11 +52,11 @@ else:
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual/'+brain_region+'_'+str(held_out_song)+'.save'
+savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_max/'+brain_region+'_'+str(held_out_song)+'.save'
 
-neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual/'+brain_region+'_'+str(held_out_song)+'.save_neurons'
+neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_max/'+brain_region+'_'+str(held_out_song)+'.save_neurons'
 
-psth_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/psth/dual/'+brain_region+'_'+str(held_out_song)+'.psth'
+psth_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/psth/dual_max/'+brain_region+'_'+str(held_out_song)+'.psth'
 
 ################################################
 # Load Data
@@ -128,9 +128,9 @@ print 'compiling train....'
 train_model = theano.function(inputs=[index], outputs=cost,
         updates=updates,
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size - 1)],
-            y: responses[index * song_size:((index + 1) * song_size - 1)]})
+            x: data_set_x[index * song_size:((index + 1) * song_size )],
+	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
+            y: responses[index * song_size:((index + 1) * song_size )]})
 
 #test_model = theano.function(inputs=[index],
 #        outputs=[cost],        givens={
@@ -142,9 +142,9 @@ train_model = theano.function(inputs=[index], outputs=cost,
 validate_model = theano.function(inputs=[index],
         outputs=[cost,nll,pred],
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size - 1)],
-            y: responses[index * song_size:((index + 1) * song_size - 1)]})
+            x: data_set_x[index * song_size:((index + 1) * song_size )],
+	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
+            y: responses[index * song_size:((index + 1) * song_size )]})
 
 #######################
 # Parameters and gradients

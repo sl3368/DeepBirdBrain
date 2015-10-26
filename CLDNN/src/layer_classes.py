@@ -844,3 +844,89 @@ class LogisticRegression(object):
             return T.mean(T.neq(self.y_pred, y))
         else:
             raise NotImplementedError()
+
+#This variant is the standard multiple input, multiple output version
+class PoissonRegression(object):
+    """Poisson Regression Class
+
+    The poisson regression is fully described by a weight matrix :math:`W`
+    and bias vector :math:`b`. 
+    """
+
+    def __init__(self, input, n_in, n_out):
+        """ Initialize the parameters of the poisson regression
+
+        :type input: theano.tensor.TensorType
+        :param input: symbolic variable that describes the input of the
+                      architecture (one minibatch)
+
+        :type n_in: int
+        :param n_in: number of input units, the dimension of the space in
+                     which the datapoints lie
+
+        :type n_out: int
+        :param n_out: number of output units, the dimension of the space in
+                      which the labels lie
+
+        """
+
+        # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
+        self.W = theano.shared(value=numpy.zeros((n_in, n_out),
+                                                 dtype=theano.config.floatX),
+                                name='W', borrow=True)
+        # initialize the baises b as a vector of n_out 0s
+        self.b = theano.shared(value=0*numpy.ones((n_out,),
+                                                 dtype=theano.config.floatX),
+                               name='b', borrow=True)
+
+        # helper variables for adagrad
+        self.W_helper = theano.shared(value=numpy.zeros((n_in, n_out), \
+            dtype=theano.config.floatX), name='W_helper', borrow=True)
+        self.b_helper = theano.shared(value=numpy.zeros((n_out,), \
+            dtype=theano.config.floatX), name='b_helper', borrow=True)
+
+	# helper variables for L1
+        self.W_helper2 = theano.shared(value=numpy.zeros((n_in, n_out), \
+            dtype=theano.config.floatX), name='W_helper2', borrow=True)
+        self.b_helper2 = theano.shared(value=numpy.zeros((n_out,), \
+            dtype=theano.config.floatX), name='b_helper2', borrow=True)
+
+        # compute vector of expected values (for each output) in symbolic form
+        self.E_y_given_x = T.exp(T.dot(input, self.W) + self.b)
+        #self.E_y_given_x = T.exp(T.dot(input, self.W) + self.b) #possible alternative
+
+        # since predictions should technically be discrete, chose y which is most likely (compute p(y) for multiple y values using E[y|x] computed 
+        #above and select max)
+        #self.y_pred = T.argmax(self.p_y_given_x, axis=1)
+
+        # parameters of the model
+        self.params = [self.W, self.b]
+        self.params_helper = [self.W_helper, self.b_helper]
+        self.params_helper2 = [self.W_helper2, self.b_helper2]
+
+    def negative_log_likelihood(self, y, trialCount):  # maskData):
+        """Return the mean of the negative log-likelihood of the prediction
+        of this model under a given target distribution.
+
+        .. math::
+        p(y_observed|model,x_input) = E[y|x]^y exp(-E[y|x])/factorial(y)
+        
+        take sum over output neurons and times
+
+        :type y: theano.tensor.TensorType
+        :param y: corresponds to a vector that gives for each example the
+                  correct label
+
+        """
+        return -T.sum( (  (y * T.log(self.E_y_given_x)) - (trialCount * self.E_y_given_x)  ) , axis = 0)
+        #return -T.sum( T.addbroadcast(maskData,1) * (  (y * T.log(self.E_y_given_x)) - (trialCount * self.E_y_given_x)  ) , axis = 0)
+        #return -T.sum( maskData *(T.log( (self.E_y_given_x.T ** y) * T.exp(-self.E_y_given_x.T) / T.gamma(y+1) )) )
+
+    def errors(self, y, trialCount): # maskData):
+        """Use summed absolute value of difference between actual number of spikes per bin and predicted E[y|x]
+
+        :type y: theano.tensor.TensorType
+        :param y: corresponds to a vector that gives for each example the
+                  correct label
+        """
+        return T.sum(  T.sqrt(((trialCount*self.E_y_given_x)-y) ** 2)  )

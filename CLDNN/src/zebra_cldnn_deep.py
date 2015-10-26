@@ -170,7 +170,7 @@ if load_params:
     layer1.b.set_value(old_p[16].get_value(), borrow=True)
     dnn.W.set_value(old_p[17].get_value(), borrow=True)
     dnn.b.set_value(old_p[18].get_value(), borrow=True)
-
+    f.close()
 
 ###############
 # TRAIN MODEL #

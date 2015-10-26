@@ -153,6 +153,7 @@ if load_params:
     lstm_1.b_o.set_value(old_p[12].get_value(), borrow=True)
     layer0.W.set_value(old_p[13].get_value(), borrow=True)
     layer0.b.set_value(old_p[14].get_value(), borrow=True)
+    f.close()
 
 
 ###############

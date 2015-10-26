@@ -20,28 +20,29 @@ from misc import Adam
 # Script Parameters
 ################################################
 
-#arguments: script_name, region, held_out_song
+#arguments: script_name, region, held_out_song, neuron number
 
 
 region_dict = {'L1':0,'L2':2,'L3':4,'NC':6,'MLd':8}
 held_out_song = int(sys.argv[2])
 brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
+neuron = int(sys.argv[3])
 
-n_epochs= 500
-n_hidden = 400
+n_epochs= 50
+n_hidden = 150
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/larger/'+brain_region+'_'+str(held_out_song)+'.out'
+results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/dual_single/'+brain_region+'_'+str(held_out_song)+'_'+str(neuron)+'.out'
 
 #Directive and path for loading previous parameters
-load_params_lstm = True
-load_params_lstm_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/zebra_lstm/zebra_lstm_400_4th.save'
+load_params_lstm = False
+load_params_lstm_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
 
 #check if exists already, then load or not load 
-load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/larger/'+brain_region+'_'+str(held_out_song)+'.save'
+load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_single/'+brain_region+'_'+str(held_out_song)+'_'+str(neuron)+'.save'
 if path.isfile(load_params_pr_filename):
     print 'Will load previous regression parameters...'
     load_params_pr = True
@@ -52,11 +53,12 @@ else:
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/larger/'+brain_region+'_'+str(held_out_song)+'.save'
+savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_single/'+brain_region+'_'+str(held_out_song)+'_'+str(neuron)+'.save'
 
-neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/neural/larger/'+brain_region+'_'+str(held_out_song)+'.save_neurons'
+neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_single/'+brain_region+'_'+str(held_out_song)+'_'+str(neuron)+'.save_neurons'
 
-psth_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/psth/larger/'+brain_region+'_'+str(held_out_song)+'.psth'
+psth_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/psth/dual_single/'+brain_region+'_'+str(held_out_song)+'_'+str(neuron)+'.psth'
+
 ################################################
 # Load Data
 ################################################
@@ -98,9 +100,9 @@ rng = numpy.random.RandomState(1234)
 
 lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
 
-output = PoissonRegression(input=lstm_1.output, n_in=n_hidden, n_out=responses.get_value(borrow=True).shape[1])
-pred = output.E_y_given_x * trial_no
-nll = output.negative_log_likelihood(y,trial_no)
+output = PoissonRegression(input=lstm_1.output, n_in=n_hidden, n_out=1)
+pred = output.E_y_given_x.T * trial_no[:,neuron]
+nll = output.negative_log_likelihood(y[:,neuron],trial_no[:,neuron],single=True)
 
 ################################
 # Objective function and GD
@@ -127,9 +129,9 @@ print 'compiling train....'
 train_model = theano.function(inputs=[index], outputs=cost,
         updates=updates,
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size - 1)],
-            y: responses[index * song_size:((index + 1) * song_size - 1)]})
+            x: data_set_x[index * song_size:((index + 1) * song_size )],
+	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
+            y: responses[index * song_size:((index + 1) * song_size )]})
 
 #test_model = theano.function(inputs=[index],
 #        outputs=[cost],        givens={
@@ -141,18 +143,18 @@ train_model = theano.function(inputs=[index], outputs=cost,
 validate_model = theano.function(inputs=[index],
         outputs=[cost,nll,pred],
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size - 1)],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size - 1)],
-            y: responses[index * song_size:((index + 1) * song_size - 1)]})
+            x: data_set_x[index * song_size:((index + 1) * song_size )] ,
+	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
+            y: responses[index * song_size:((index + 1) * song_size )]})
 
 #######################
 # Parameters and gradients
 #######################
 print 'parameters and gradients...'
 
-if load_params_lstm:
-    print 'loading parameters from file...'
-    f = open( load_params_lstm_filename)
+if load_params_pr:
+    print 'loading LSTM parameters from file...'
+    f = open( load_params_pr_filename)
     old_p = cPickle.load(f)
     lstm_1.W_i.set_value(old_p[0].get_value(), borrow=True)
     lstm_1.W_f.set_value(old_p[1].get_value(), borrow=True)
@@ -170,11 +172,11 @@ if load_params_lstm:
     f.close()
 
 if load_params_pr:
-    print 'loading parameters from file...'
+    print 'loading PR parameters from file...'
     f = open( load_params_pr_filename)
     old_p = cPickle.load(f)
-    output.W.set_value(old_p[0].get_value(), borrow=True)
-    output.b.set_value(old_p[1].get_value(), borrow=True)
+    output.W.set_value(old_p[13].get_value(), borrow=True)
+    output.b.set_value(old_p[14].get_value(), borrow=True)
     f.close()
 
 ###############
@@ -244,7 +246,7 @@ while (epoch < n_epochs):
         for obj in [validation_info[1]]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
         f.close()
-	
+
 	f = file(psth_savefilename, 'wb')
         for obj in [validation_info[2]]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)

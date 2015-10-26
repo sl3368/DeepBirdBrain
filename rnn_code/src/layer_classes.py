@@ -745,7 +745,7 @@ class PoissonRegression(object):
         self.params_helper = [self.W_helper, self.b_helper]
         self.params_helper2 = [self.W_helper2, self.b_helper2]
 
-    def negative_log_likelihood(self, y, trialCount):  # maskData):
+    def negative_log_likelihood(self, y, trialCount,single=False):  # maskData):
         """Return the mean of the negative log-likelihood of the prediction
         of this model under a given target distribution.
 
@@ -759,7 +759,13 @@ class PoissonRegression(object):
                   correct label
 
         """
-        return -T.sum( (  (y * T.log(self.E_y_given_x)) - (trialCount * self.E_y_given_x)  ) , axis = 0)
+	self.firing = y
+	self.counts = trialCount
+	self.trans_ex = self.E_y_given_x
+	if single:
+	    return -T.sum( (  (T.log(self.E_y_given_x.T))*y - (self.E_y_given_x.T*trialCount)  ) , axis = 1)   	
+	else:
+            return -T.sum( (  (y * T.log(self.E_y_given_x)) - (trialCount * self.E_y_given_x)  ) , axis = 0)
         #return -T.sum( T.addbroadcast(maskData,1) * (  (y * T.log(self.E_y_given_x)) - (trialCount * self.E_y_given_x)  ) , axis = 0)
         #return -T.sum( maskData *(T.log( (self.E_y_given_x.T ** y) * T.exp(-self.E_y_given_x.T) / T.gamma(y+1) )) )
 
