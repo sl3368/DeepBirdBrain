@@ -766,6 +766,7 @@ class PoissonRegression(object):
 	    return -T.sum( (  (T.log(self.E_y_given_x.T))*y - (self.E_y_given_x.T*trialCount)  ) , axis = 1)   	
 	else:
             return -T.sum( (  (y * T.log(self.E_y_given_x)) - (trialCount * self.E_y_given_x)  ) , axis = 0)
+	#return T.sum Maskdata*sum( nll)
         #return -T.sum( T.addbroadcast(maskData,1) * (  (y * T.log(self.E_y_given_x)) - (trialCount * self.E_y_given_x)  ) , axis = 0)
         #return -T.sum( maskData *(T.log( (self.E_y_given_x.T ** y) * T.exp(-self.E_y_given_x.T) / T.gamma(y+1) )) )
 

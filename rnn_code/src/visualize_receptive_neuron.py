@@ -10,11 +10,13 @@ import sys
 import time
 import numpy
 import theano
+from theano import shared
 import theano.tensor as T
 from loading_functions import load_all_data, load_class_data_batch, load_class_data_vt, load_neural_data
 from layer_classes import LinearRegression, Dropout, LSTM, RNN, hybridRNN , IRNN, PoissonRegression
 from one_ahead import GradClip, clip_gradient
 from misc import Adam
+from numpy.random import rand
 
 ################################################
 # Script Parameters
@@ -27,36 +29,41 @@ region_dict = {'L1':0,'L2':2,'L3':4,'NC':6,'MLd':8}
 held_out_song = int(sys.argv[2])
 brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
+neuron = int(sys.argv[3])
 
-n_epochs= 75
-n_hidden = 1000
+n_epochs= 2500
+n_hidden = 500
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
 
 #Filepath for printing results
-results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/dual_1000/'+brain_region+'_'+str(held_out_song)+'.out'
+results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/dual_500/visualize/'+brain_region+'_'+str(held_out_song)+'_'+str(neuron)+'.out'
 
 #Directive and path for loading previous parameters
 load_params_lstm = False
-load_params_lstm_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
+load_params_lstm_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/500/zebra_1st_20_5000.save'
 
 #check if exists already, then load or not load 
-load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_1000/'+brain_region+'_'+str(held_out_song)+'.save'
+load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_500/'+brain_region+'_'+str(held_out_song)+'.save'
 if path.isfile(load_params_pr_filename):
     print 'Will load previous regression parameters...'
     load_params_pr = True
 else:
     load_params_pr = False
 	
-
 song_size = 2459
 
 #filepath for saving parameters
-savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_1000/'+brain_region+'_'+str(held_out_song)+'.save'
+savefilename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_500/visualize/'+brain_region+'_'+str(held_out_song)+'_'+str(neuron)+'.visualization'
 
-neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_1000/'+brain_region+'_'+str(held_out_song)+'.save_neurons'
+if path.isfile(savefilename):
+    load_visualize = True
+else:
+    load_visualize = False
 
-psth_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/psth/dual_1000/'+brain_region+'_'+str(held_out_song)+'.psth'
+neurons_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_500/visualize/'+brain_region+'_'+str(held_out_song)+'.save_neurons'
+
+psth_savefilename ='/vega/stats/users/sl3368/rnn_code/saves/params/psth/dual_500/visualize/'+brain_region+'_'+str(held_out_song)+'.psth'
 
 ################################################
 # Load Data
@@ -86,8 +93,11 @@ print 'building the model...'
 
 # allocate symbolic variables for the data
 index = T.lscalar()  # index to a [mini]batch
-x = T.matrix('x')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
-x = clip_gradient(x,1.0)     
+#x = T.matrix('x')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
+#x = clip_gradient(x,1.0)     
+init = rand(song_size,60).astype('f')
+x = shared(init,borrow=True)
+
 y = T.matrix('y')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
 trial_no = T.matrix('trial_no')
 
@@ -99,9 +109,9 @@ rng = numpy.random.RandomState(1234)
 
 lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
 
-output = PoissonRegression(input=lstm_1.output, n_in=n_hidden, n_out=responses.get_value(borrow=True).shape[1])
-pred = output.E_y_given_x * trial_no
-nll = output.negative_log_likelihood(y,trial_no)
+output = PoissonRegression(input=lstm_1.output, n_in=n_hidden, n_out=1)
+pred = output.E_y_given_x.T * trial_no[:,neuron]
+nll = output.negative_log_likelihood(y[:,neuron],trial_no[:,neuron],single=True)
 
 ################################
 # Objective function and GD
@@ -114,7 +124,7 @@ print 'defining cost, parameters, and learning function...'
 cost = T.mean(nll)
 
 #Defining params
-params = lstm_1.params + output.params
+params = [x]
 
 # updates from ADAM
 updates = Adam(cost, params)
@@ -128,7 +138,6 @@ print 'compiling train....'
 train_model = theano.function(inputs=[index], outputs=cost,
         updates=updates,
         givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size )],
 	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
             y: responses[index * song_size:((index + 1) * song_size )]})
 
@@ -139,12 +148,12 @@ train_model = theano.function(inputs=[index], outputs=cost,
 #
 #
 
-validate_model = theano.function(inputs=[index],
-        outputs=[cost,nll,pred],
-        givens={
-            x: data_set_x[index * song_size:((index + 1) * song_size )],
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
-            y: responses[index * song_size:((index + 1) * song_size )]})
+#validate_model = theano.function(inputs=[index],
+#        outputs=[cost,nll,pred],
+#        givens={
+#            x: data_set_x[index * song_size:((index + 1) * song_size )],
+#	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
+#            y: responses[index * song_size:((index + 1) * song_size )]})
 
 #######################
 # Parameters and gradients
@@ -178,6 +187,13 @@ if load_params_pr:
     output.b.set_value(old_p[14].get_value(), borrow=True)
     f.close()
 
+if load_visualize:
+    print 'loading visualization from file...'
+    f = open(savefilename)
+    old_v = cPickle.load(f)
+    x.set_value(old_v, borrow=True)
+    f.close()
+
 ###############
 # TRAIN MODEL #
 ###############
@@ -202,17 +218,18 @@ while (epoch < n_epochs):
     epoch = epoch + 1
 
     mb_costs = []
+
     heldout = 0
 
     for minibatch_index in xrange(14):
-        if(heldout!=held_out_song):
+        if(heldout==held_out_song):
             minibatch_avg_cost = train_model(minibatch_index)
             print minibatch_avg_cost
 	    mb_costs.append(minibatch_avg_cost)
 	heldout=heldout+1
 
     for minibatch_index in xrange(24,30):
-        if(heldout!=held_out_song):
+        if(heldout==held_out_song):
 	    minibatch_avg_cost = train_model(minibatch_index)
             print minibatch_avg_cost
 	    mb_costs.append(minibatch_avg_cost)
@@ -220,35 +237,36 @@ while (epoch < n_epochs):
 
     avg_cost = numpy.mean(mb_costs)
     
-    if held_out_song<14:
-	heldoutsong=held_out_song
-    else:
-	heldoutsong=held_out_song+10
-    validation_info = validate_model(heldoutsong)
+    #if held_out_song<14:
+    #    heldoutsong=held_out_song
+    #else:
+    #    heldoutsong=held_out_song+10
+    #validation_info = validate_model(heldoutsong)
 
-    print('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, validation_info[0]))
+    print('epoch %i, training error %f' %  (epoch, avg_cost))
     
     r_log=open(results_filename, 'a')
-    r_log.write('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, validation_info[0]))
+    r_log.write('epoch %i, training error %f' %  (epoch, avg_cost))
     r_log.close()
-
+    
     # if we got the best validation score until now
-    if validation_info[0] < best_validation_loss:
-	best_validation_loss = validation_info[0]
+    if avg_cost < best_validation_loss:
+	best_validation_loss = avg_cost
+        visualization = numpy.asarray(x.eval())
         #store data
         f = file(savefilename, 'wb')
-        for obj in [params]:
+        for obj in [visualization]:
             cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
         f.close()
         
-        f = file(neurons_savefilename, 'wb')
-        for obj in [validation_info[1]]:
-            cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
-        f.close()
+        #f = file(neurons_savefilename, 'wb')
+        #for obj in [validation_info[1]]:
+        #    cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
+        #f.close()
 
-	f = file(psth_savefilename, 'wb')
-        for obj in [validation_info[2]]:
-            cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
-        f.close()
+	#f = file(psth_savefilename, 'wb')
+        #for obj in [validation_info[2]]:
+        #    cPickle.dump(obj, f, protocol=cPickle.HIGHEST_PROTOCOL)
+        #f.close()
 
 print '...Finished...'
