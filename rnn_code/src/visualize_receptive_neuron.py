@@ -22,7 +22,7 @@ from numpy.random import rand
 # Script Parameters
 ################################################
 
-#arguments: script_name, region, held_out_song
+#arguments: script_name, region, held_out_song, neuron
 
 
 region_dict = {'L1':0,'L2':2,'L3':4,'NC':6,'MLd':8}
@@ -31,7 +31,7 @@ brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
 neuron = int(sys.argv[3])
 
-n_epochs= 2500
+n_epochs= 10000
 n_hidden = 500
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
@@ -93,9 +93,10 @@ print 'building the model...'
 
 # allocate symbolic variables for the data
 index = T.lscalar()  # index to a [mini]batch
+section = T.lscalar()
 #x = T.matrix('x')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
 #x = clip_gradient(x,1.0)     
-init = rand(song_size,60).astype('f')
+init = numpy.zeros((song_size,60)).astype('f')
 x = shared(init,borrow=True)
 
 y = T.matrix('y')  # the data is presented as a vector of inputs with many exchangeable examples of this vector
@@ -107,7 +108,7 @@ rng = numpy.random.RandomState(1234)
 
 # Architecture: input --> LSTM --> predict one-ahead
 
-lstm_1 = LSTM(rng, x, n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
+lstm_1 = LSTM(rng, x[:section], n_in=data_set_x.get_value(borrow=True).shape[1], n_out=n_hidden)
 
 output = PoissonRegression(input=lstm_1.output, n_in=n_hidden, n_out=1)
 pred = output.E_y_given_x.T * trial_no[:,neuron]
@@ -135,11 +136,11 @@ updates = Adam(cost, params)
 
 print 'compiling train....'
 
-train_model = theano.function(inputs=[index], outputs=cost,
+train_model = theano.function(inputs=[index,section], outputs=cost,
         updates=updates,
         givens={
-	    trial_no: ntrials[index * song_size:((index + 1) * song_size )],
-            y: responses[index * song_size:((index + 1) * song_size )]})
+	    trial_no: ntrials[index * song_size:((index * song_size)+section)],
+            y: responses[index * song_size:((index * song_size)+section)]})
 
 #test_model = theano.function(inputs=[index],
 #        outputs=[cost],        givens={
@@ -208,6 +209,8 @@ r_log=open(results_filename,'w')
 r_log.write('Starting training...\n')
 r_log.close()
 
+x.set_value(numpy.zeros((100,60)).astype('f'),borrow=True)
+
 while (epoch < n_epochs):
     print str(epoch)+' epoch took: '+str(time.time()-last_e)
     r_log=open(results_filename, 'a')
@@ -223,14 +226,14 @@ while (epoch < n_epochs):
 
     for minibatch_index in xrange(14):
         if(heldout==held_out_song):
-            minibatch_avg_cost = train_model(minibatch_index)
+            minibatch_avg_cost = train_model(minibatch_index,100)
             print minibatch_avg_cost
 	    mb_costs.append(minibatch_avg_cost)
 	heldout=heldout+1
 
     for minibatch_index in xrange(24,30):
         if(heldout==held_out_song):
-	    minibatch_avg_cost = train_model(minibatch_index)
+	    minibatch_avg_cost = train_model(minibatch_index,100)
             print minibatch_avg_cost
 	    mb_costs.append(minibatch_avg_cost)
 	heldout=heldout+1

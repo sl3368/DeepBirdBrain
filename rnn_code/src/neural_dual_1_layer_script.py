@@ -28,17 +28,13 @@ held_out_song = int(sys.argv[2])
 brain_region = sys.argv[1]
 brain_region_index = region_dict[brain_region]
 
-n_epochs= 75
+n_epochs= 200
 n_hidden = 1000
 
 print 'Running CV for held out song '+str(held_out_song)+' for brain region '+brain_region+' index at '+str(brain_region_index)
 
 #Filepath for printing results
 results_filename='/vega/stats/users/sl3368/rnn_code/results/neural/dual_1000/'+brain_region+'_'+str(held_out_song)+'.out'
-
-#Directive and path for loading previous parameters
-load_params_lstm = False
-load_params_lstm_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/lstm/1_layer/1000/zebra_1st_20_5000.save'
 
 #check if exists already, then load or not load 
 load_params_pr_filename = '/vega/stats/users/sl3368/rnn_code/saves/params/neural/dual_1000/'+brain_region+'_'+str(held_out_song)+'.save'
@@ -226,10 +222,10 @@ while (epoch < n_epochs):
 	heldoutsong=held_out_song+10
     validation_info = validate_model(heldoutsong)
 
-    print('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, validation_info[0]))
+    print('epoch %i, training error %f, held out error %f' %  (epoch, avg_cost, validation_info[0]))
     
     r_log=open(results_filename, 'a')
-    r_log.write('epoch %i, training error %i, held out error %f' %  (epoch, avg_cost, validation_info[0]))
+    r_log.write('epoch %i, training error %f, held out error %f' %  (epoch, avg_cost, validation_info[0]))
     r_log.close()
 
     # if we got the best validation score until now
